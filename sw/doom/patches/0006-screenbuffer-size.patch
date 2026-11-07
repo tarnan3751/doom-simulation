@@ -1,0 +1,15 @@
+Patch 0006: DG_ScreenBuffer is allocated with sizeof(pixel_t) per pixel (64 000 bytes in CMAP256 mode,
+not 256 000).
+
+diff -ruN a/doomgeneric.c b/doomgeneric.c
+--- a/doomgeneric.c	2026-11-06 06:20:39
++++ b/doomgeneric.c	2026-11-06 06:20:39
+@@ -18,7 +18,7 @@
+ 
+ 	M_FindResponseFile();
+ 
+-	DG_ScreenBuffer = malloc(DOOMGENERIC_RESX * DOOMGENERIC_RESY * 4);
++	DG_ScreenBuffer = malloc(DOOMGENERIC_RESX * DOOMGENERIC_RESY * sizeof(pixel_t));
+ 
+ 	DG_Init();
+ 

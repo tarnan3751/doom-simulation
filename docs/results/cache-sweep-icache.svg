@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 380" width="640" height="380" font-family="Helvetica,Arial,sans-serif" font-size="12">
+<rect width="640" height="380" fill="#fff"/>
+<text x="320.0" y="24" text-anchor="middle" font-size="15" font-weight="bold" fill="#222">Doom demo3: frame rate vs I-cache size</text>
+<line x1="70" x2="570" y1="320.0" y2="320.0" stroke="#ddd"/>
+<text x="62" y="324.0" text-anchor="end" fill="#1f6fb4">0</text>
+<text x="578" y="324.0" fill="#c7561a">0</text>
+<line x1="70" x2="570" y1="266.0" y2="266.0" stroke="#ddd"/>
+<text x="62" y="270.0" text-anchor="end" fill="#1f6fb4">10</text>
+<text x="578" y="270.0" fill="#c7561a">1</text>
+<line x1="70" x2="570" y1="212.0" y2="212.0" stroke="#ddd"/>
+<text x="62" y="216.0" text-anchor="end" fill="#1f6fb4">20</text>
+<text x="578" y="216.0" fill="#c7561a">2</text>
+<line x1="70" x2="570" y1="158.0" y2="158.0" stroke="#ddd"/>
+<text x="62" y="162.0" text-anchor="end" fill="#1f6fb4">30</text>
+<text x="578" y="162.0" fill="#c7561a">3</text>
+<line x1="70" x2="570" y1="104.0" y2="104.0" stroke="#ddd"/>
+<text x="62" y="108.0" text-anchor="end" fill="#1f6fb4">40</text>
+<text x="578" y="108.0" fill="#c7561a">4</text>
+<line x1="70" x2="570" y1="50.0" y2="50.0" stroke="#ddd"/>
+<text x="62" y="54.0" text-anchor="end" fill="#1f6fb4">50</text>
+<text x="578" y="54.0" fill="#c7561a">5</text>
+<line x1="70" x2="70" y1="50" y2="320" stroke="#222"/><line x1="70" x2="570" y1="320" y2="320" stroke="#222"/>
+<text x="111.7" y="338" text-anchor="middle" fill="#222">1 KB</text>
+<text x="195.0" y="338" text-anchor="middle" fill="#222">2 KB</text>
+<text x="278.3" y="338" text-anchor="middle" fill="#222">4 KB</text>
+<text x="361.7" y="338" text-anchor="middle" fill="#222">8 KB (default)</text>
+<text x="445.0" y="338" text-anchor="middle" fill="#222">16 KB</text>
+<text x="528.3" y="338" text-anchor="middle" fill="#222">32 KB</text>
+<text x="320.0" y="368" text-anchor="middle" fill="#222">I-cache size (D-cache fixed at 16 KB)</text>
+<text transform="translate(16 185.0) rotate(-90)" text-anchor="middle" fill="#1f6fb4">frames per second at 50 MHz</text>
+<text transform="translate(626 185.0) rotate(90)" text-anchor="middle" fill="#c7561a">I-cache miss rate (%)</text>
+<polyline fill="none" stroke="#1f6fb4" stroke-width="2.5" points="111.7,112.6 195.0,87.8 278.3,83.7 361.7,78.8 445.0,77.8 528.3,76.8"/>
+<polyline fill="none" stroke="#c7561a" stroke-width="2.5" stroke-dasharray="6 4" points="111.7,175.6 195.0,275.8 278.3,290.7 361.7,308.5 445.0,312.1 528.3,315.5"/>
+<circle cx="111.7" cy="112.6" r="4" fill="#1f6fb4"/><text x="111.7" y="103.6" text-anchor="middle" fill="#1f6fb4" font-size="11">38.4</text>
+<rect x="108.2" y="172.1" width="7" height="7" fill="#c7561a"/><text x="111.7" y="192.6" text-anchor="middle" fill="#c7561a" font-size="11">2.67</text>
+<circle cx="195.0" cy="87.8" r="4" fill="#1f6fb4"/><text x="195.0" y="78.8" text-anchor="middle" fill="#1f6fb4" font-size="11">43.0</text>
+<rect x="191.5" y="272.3" width="7" height="7" fill="#c7561a"/><text x="195.0" y="292.8" text-anchor="middle" fill="#c7561a" font-size="11">0.82</text>
+<circle cx="278.3" cy="83.7" r="4" fill="#1f6fb4"/><text x="278.3" y="74.7" text-anchor="middle" fill="#1f6fb4" font-size="11">43.8</text>
+<rect x="274.8" y="287.2" width="7" height="7" fill="#c7561a"/><text x="278.3" y="307.7" text-anchor="middle" fill="#c7561a" font-size="11">0.54</text>
+<circle cx="361.7" cy="78.8" r="4" fill="#1f6fb4"/><text x="361.7" y="69.8" text-anchor="middle" fill="#1f6fb4" font-size="11">44.7</text>
+<rect x="358.2" y="305.0" width="7" height="7" fill="#c7561a"/><text x="361.7" y="325.5" text-anchor="middle" fill="#c7561a" font-size="11">0.21</text>
+<circle cx="445.0" cy="77.8" r="4" fill="#1f6fb4"/><text x="445.0" y="68.8" text-anchor="middle" fill="#1f6fb4" font-size="11">44.8</text>
+<rect x="441.5" y="308.6" width="7" height="7" fill="#c7561a"/><text x="445.0" y="329.1" text-anchor="middle" fill="#c7561a" font-size="11">0.15</text>
+<circle cx="528.3" cy="76.8" r="4" fill="#1f6fb4"/><text x="528.3" y="67.8" text-anchor="middle" fill="#1f6fb4" font-size="11">45.0</text>
+<rect x="524.8" y="312.0" width="7" height="7" fill="#c7561a"/><text x="528.3" y="332.5" text-anchor="middle" fill="#c7561a" font-size="11">0.08</text>
+<line x1="80" x2="104" y1="60" y2="60" stroke="#1f6fb4" stroke-width="2.5"/><text x="110" y="64" fill="#222">fps (left axis)</text>
+<line x1="220" x2="244" y1="60" y2="60" stroke="#c7561a" stroke-width="2.5" stroke-dasharray="6 4"/><text x="250" y="64" fill="#222">I-cache miss rate (right axis)</text>
+</svg>

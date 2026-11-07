@@ -1,0 +1,17 @@
+# local tools, fetched third-party sources and build products are never committed
+.tools/
+third_party/
+build/
+obj_dir/
+*.o
+*.d
+*.elf
+*.bin
+*.vcd
+*.fst
+.DS_Store
+__pycache__/
+*.pyc
+*.profdata
+*.ppm
+*.dfrm

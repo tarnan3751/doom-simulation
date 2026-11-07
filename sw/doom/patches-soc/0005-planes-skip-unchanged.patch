@@ -1,0 +1,36 @@
+SoC patch 0005: R_DrawPlanes calls R_MakeSpans only where a plane column's top/bottom change (it does
+nothing otherwise); the remaining calls are the same, in the same order.
+
+--- a/r_plane.c	2026-11-06 12:32:54
++++ b/r_plane.c	2026-11-06 12:43:45
+@@ -365,6 +365,7 @@
+     int			stop;
+     int			angle;
+     int                 lumpnum;
++    int			t1, b1, t2, b2;
+ 				
+ #ifdef RANGECHECK
+     if (ds_p - drawsegs > MAXDRAWSEGS)
+@@ -433,12 +434,18 @@
+ 		
+ 	stop = pl->maxx + 1;
+ 
++	// SoC: R_MakeSpans does nothing for a column whose top and bottom
++	// equal the previous column's, so it is only called where they change.
++	t1 = pl->top[pl->minx-1];
++	b1 = pl->bottom[pl->minx-1];
+ 	for (x=pl->minx ; x<= stop ; x++)
+ 	{
+-	    R_MakeSpans(x,pl->top[x-1],
+-			pl->bottom[x-1],
+-			pl->top[x],
+-			pl->bottom[x]);
++	    t2 = pl->top[x];
++	    b2 = pl->bottom[x];
++	    if (t1 != t2 || b1 != b2)
++		R_MakeSpans(x,t1,b1,t2,b2);
++	    t1 = t2;
++	    b1 = b2;
+ 	}
+ 	
+         W_ReleaseLumpNum(lumpnum);

@@ -1,0 +1,4 @@
+// Pins for the core-only measurement wrapper (not a board design; any free pins would do).
+IO_LOC "clk" 4;
+IO_LOC "rst_btn" 88;
+IO_LOC "o" 15;

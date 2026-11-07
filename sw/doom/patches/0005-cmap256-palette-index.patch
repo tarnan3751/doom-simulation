@@ -1,0 +1,26 @@
+Patch 0005: in CMAP256 mode I_GetPaletteIndex searches colors[] (it searched a never-filled RGB565
+table, always returned 0 and printed a line per call).
+
+diff -ruN a/i_video.c b/i_video.c
+--- a/i_video.c	2026-11-06 06:20:39
++++ b/i_video.c	2026-11-06 06:20:39
+@@ -427,16 +427,14 @@
+     int i;
+     col_t color;
+ 
+-    printf("I_GetPaletteIndex\n");
+-
+     best = 0;
+     best_diff = INT_MAX;
+ 
+     for (i = 0; i < 256; ++i)
+     {
+-    	color.r = GFX_RGB565_R(rgb565_palette[i]);
+-    	color.g = GFX_RGB565_G(rgb565_palette[i]);
+-    	color.b = GFX_RGB565_B(rgb565_palette[i]);
++    	color.r = colors[i].r;
++    	color.g = colors[i].g;
++    	color.b = colors[i].b;
+ 
+         diff = (r - color.r) * (r - color.r)
+              + (g - color.g) * (g - color.g)

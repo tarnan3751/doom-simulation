@@ -1,0 +1,16 @@
+SoC patch 0004: I_Error is declared noreturn (it always exits), so callers keep the error path out of
+the common one.
+
+--- a/i_system.h	2026-11-06 12:32:54
++++ b/i_system.h	2026-11-06 12:43:45
+@@ -52,7 +52,9 @@
+ // Clean exit, displays sell blurb.
+ void I_Quit (void);
+ 
+-void I_Error (char *error, ...);
++// SoC: declared noreturn (it always ends in exit()), so callers need not
++// keep state alive across their error checks.
++__attribute__((noreturn)) void I_Error (char *error, ...);
+ 
+ // True once I_Error has started shutting the program down.
+ boolean I_InError (void);

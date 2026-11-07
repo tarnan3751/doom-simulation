@@ -1,0 +1,118 @@
+SoC patch 0003: FixedDiv without libgcc's 64-bit division (exact: two 32-bit divides, checked by
+sw/doom/tests/fixed_test.c), FixedMul inline.  See sw/doom/README.md.
+
+--- a/m_fixed.h	2026-11-06 13:15:20
++++ b/m_fixed.h	2026-11-06 13:00:49
+@@ -31,7 +31,12 @@
+ 
+ typedef int fixed_t;
+ 
+-fixed_t FixedMul	(fixed_t a, fixed_t b);
++// SoC: inline (a mul and a mulh), not a call: about 4 million calls per demo.
++#include <stdint.h>
++static inline fixed_t FixedMul(fixed_t a, fixed_t b)
++{
++    return ((int64_t) a * (int64_t) b) >> FRACBITS;
++}
+ fixed_t FixedDiv	(fixed_t a, fixed_t b);
+ 
+ 
+--- a/m_fixed.c	2026-11-06 13:15:20
++++ b/m_fixed.c	2026-11-06 13:14:29
+@@ -28,35 +28,81 @@
+ 
+ 
+ 
+-// Fixme. __USE_C_FIXED__ or something.
++// SoC: FixedMul is an inline function in m_fixed.h.
+ 
+-fixed_t
+-FixedMul
+-( fixed_t	a,
+-  fixed_t	b )
+-{
+-    return ((int64_t) a * (int64_t) b) >> FRACBITS;
+-}
+ 
+ 
+-
+ //
+ // FixedDiv, C version.
+ //
++// SoC: the same results as upstream's ((int64_t) a << 16) / b, without
++// libgcc's generic 64-bit division (__divdi3, several hundred cycles on
++// RV32IM): once the overflow test has passed, |a| < |b| * 2^14, so the
++// quotient has at most 30 bits and two 32-bit hardware divides give it
++// exactly (udiv_frac).  a == INT_MIN (|a| not representable) keeps the
++// 64-bit expression.
++//
+ 
++// The remainders below are computed as a - q * b on purpose (a multiply is
++// 2 cycles, a remu 33): the empty asm hides q from GCC, which would otherwise
++// turn the expression back into a remainder instruction.
++#define OPAQUE(v) __asm__ ("" : "+r" (v))
++
++// floor(a * 2^16 / b) for a < b * 2^14 (so the result is below 2^30), b > 0.
++static uint32_t udiv_frac(uint32_t a, uint32_t b)
++{
++    uint32_t q1, r, q0, rhat, bn1, bn0;
++    int s;
++
++    q1 = a / b;                 // integer part, < 2^14
++    OPAQUE(q1);
++    r = a - q1 * b;             // r < b: the fraction is floor(r * 2^16 / b)
++
++    if (b <= 0x10000)
++        return (q1 << 16) + (r << 16) / b;     // r << 16 < 2^32
++
++    // b > 2^16: one step of Knuth's algorithm D in base 2^16 (Hacker's
++    // Delight, divlu).  Normalise b so that its top bit is set; the dividend
++    // (r << s) * 2^16 has the digits (r << s) >> 16, (r << s) & 0xffff, 0.
++    s = 0;
++    if (b <= 0x00ffffff) { s += 8; }
++    if ((b << s) <= 0x0fffffff) { s += 4; }
++    if ((b << s) <= 0x3fffffff) { s += 2; }
++    if ((b << s) <= 0x7fffffff) { s += 1; }
++    b <<= s;
++    r <<= s;                    // still < b
++    bn1 = b >> 16;
++    bn0 = b & 0xffff;
++    q0 = r / bn1;               // estimate, at most 2 too large
++    OPAQUE(q0);
++    rhat = r - q0 * bn1;
++    // with a two-digit divisor this test makes the digit exact
++    while (q0 > 0xffff || q0 * bn0 > (rhat << 16))
++    {
++        q0--;
++        rhat += bn1;
++        if (rhat > 0xffff)
++            break;
++    }
++    return (q1 << 16) + q0;
++}
++
+ fixed_t FixedDiv(fixed_t a, fixed_t b)
+ {
++    uint32_t q;
++
+     if ((abs(a) >> 14) >= abs(b))
+     {
+ 	return (a^b) < 0 ? INT_MIN : INT_MAX;
+     }
++    else if (a == INT_MIN)
++    {
++	return (fixed_t) (((int64_t) a << 16) / b);
++    }
+     else
+     {
+-	int64_t result;
+-
+-	result = ((int64_t) a << 16) / b;
+-
+-	return (fixed_t) result;
++	q = udiv_frac(a < 0 ? -(uint32_t) a : (uint32_t) a,
++	              b < 0 ? -(uint32_t) b : (uint32_t) b);
++	return (a^b) < 0 ? -(fixed_t) q : (fixed_t) q;
+     }
+ }
+-

@@ -1,0 +1,55 @@
+Patch 0004: zone blocks have defined contents - zeroed on allocation, with 256 zero bytes of tail pad.
+The column drawers read dc_source[(frac>>16)&127] past the end of short columns (the first pixel of a
+sprite column can use index 127), i.e. into the next block's header or stale data, which differs per
+run and per platform; demo2 frame 2363 showed it.  Now such reads see zeros everywhere.
+
+diff -ruN a/z_zone.c b/z_zone.c
+--- a/z_zone.c	2026-11-06 06:20:39
++++ b/z_zone.c	2026-11-06 06:20:39
+@@ -17,6 +17,8 @@
+ //
+ 
+ 
++#include <string.h>
++
+ #include "z_zone.h"
+ #include "i_system.h"
+ #include "doomtype.h"
+@@ -180,7 +182,17 @@
+ //
+ #define MINFRAGMENT		64
+ 
++// Defined zone contents.  The column drawers index dc_source[(frac>>16)&127]
++// and a column that is shorter than 128 bytes is regularly read past its end
++// (e.g. the first pixel of a sprite column uses index -1 & 127 == 127).  In
++// upstream that reads whatever follows the block in the zone: the next block
++// header (pointers, so different on every run and on a 32-bit target) or
++// stale data.  Every block therefore carries ZONE_TAIL_PAD zero bytes behind
++// its requested size, and is cleared on allocation, so such reads see the same
++// zeros on every platform.
++#define ZONE_TAIL_PAD		256
+ 
++
+ void*
+ Z_Malloc
+ ( int		size,
+@@ -201,7 +213,8 @@
+     // of sufficient size,
+     // throwing out any purgable blocks along the way.
+ 
+-    // account for size of block header
++    // account for tail pad and size of block header
++    size += ZONE_TAIL_PAD;
+     size += sizeof(memblock_t);
+     
+     // if there is a free block behind the rover,
+@@ -275,6 +288,9 @@
+     base->tag = tag;
+ 
+     result  = (void *) ((byte *)base + sizeof(memblock_t));
++
++    // clear the whole block: payload, tail pad and any absorbed fragment
++    memset (result, 0, base->size - sizeof(memblock_t));
+ 
+     if (base->user)
+     {

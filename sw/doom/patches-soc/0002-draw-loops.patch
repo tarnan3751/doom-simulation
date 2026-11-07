@@ -1,0 +1,186 @@
+SoC patch 0002: R_DrawColumn and R_DrawSpan with fewer instructions per pixel - globals read once,
+odd pixels first then four per iteration, frac kept << 9 (the texel index is one shift; exact modulo
+2^32), destination from viewbase.  The same pixels in the same places.  See sw/doom/README.md.
+
+--- a/r_draw.c	2026-11-06 13:40:48
++++ b/r_draw.c	2026-11-06 13:31:45
+@@ -74,7 +74,12 @@
+ 
+ static byte *background_buffer = NULL;
+ 
++// SoC: ylookup[0] + columnofs[0], set by R_InitBuffer.  Inside the view,
++// ylookup[y] + columnofs[x] == viewbase + y*SCREENWIDTH + x, so the column
++// and span drawers compute their destination without the two tables.
++static byte *viewbase;
+ 
++
+ //
+ // R_DrawColumn
+ // Source is the top of the column to scale.
+@@ -103,8 +108,10 @@
+ { 
+     int			count; 
+     byte*		dest; 
+-    fixed_t		frac;
+-    fixed_t		fracstep;	 
++    const byte*		source;
++    const lighttable_t*	colormap;
++    unsigned		frac;
++    unsigned		fracstep;
+  
+     count = dc_yh - dc_yl; 
+ 
+@@ -119,29 +126,47 @@
+ 	I_Error ("R_DrawColumn: %i to %i at %i", dc_yl, dc_yh, dc_x); 
+ #endif 
+ 
+-    // Framebuffer destination address.
+-    // Use ylookup LUT to avoid multiply with ScreenWidth.
+-    // Use columnofs LUT for subwindows? 
+-    dest = ylookup[dc_yl] + columnofs[dc_x];  
++    // SoC: the same pixels as upstream's loop, with fewer instructions.
++    // The globals are read once (a byte store may alias them, so the
++    // compiler would reload them for every pixel), and frac is kept
++    // shifted left by 9: (frac >> FRACBITS) & 127 is bits 16..22 of frac,
++    // i.e. the top 7 bits of frac << 9, and the sums agree modulo 2^32.
++    source = dc_source;
++    colormap = dc_colormap;
++    dest = viewbase + dc_yl*SCREENWIDTH + dc_x;
++    fracstep = (unsigned) dc_iscale << 9;
++    frac = (unsigned) (dc_texturemid + (dc_yl-centery)*dc_iscale) << 9;
++    count++;
+ 
+-    // Determine scaling,
+-    //  which is the only mapping to be done.
+-    fracstep = dc_iscale; 
+-    frac = dc_texturemid + (dc_yl-centery)*fracstep; 
+-
+-    // Inner loop that does the actual texture mapping,
+-    //  e.g. a DDA-lile scaling.
+-    // This is as fast as it gets.
+-    do 
++    // the odd pixels first, then groups of four
++    if (count & 1)
+     {
+-	// Re-map color indices from wall texture column
+-	//  using a lighting/special effects LUT.
+-	*dest = dc_colormap[dc_source[(frac>>FRACBITS)&127]];
+-	
+-	dest += SCREENWIDTH; 
++	*dest = colormap[source[frac >> 25]];
++	dest += SCREENWIDTH;
+ 	frac += fracstep;
+-	
+-    } while (count--); 
++    }
++    if (count & 2)
++    {
++	dest[0] = colormap[source[frac >> 25]];
++	frac += fracstep;
++	dest[SCREENWIDTH] = colormap[source[frac >> 25]];
++	frac += fracstep;
++	dest += 2*SCREENWIDTH;
++    }
++    for (count >>= 2; count > 0; count--)
++    {
++	byte a, b, c, d;
++
++	a = source[frac >> 25]; frac += fracstep;
++	b = source[frac >> 25]; frac += fracstep;
++	c = source[frac >> 25]; frac += fracstep;
++	d = source[frac >> 25]; frac += fracstep;
++	dest[0] = colormap[a];
++	dest[SCREENWIDTH] = colormap[b];
++	dest[2*SCREENWIDTH] = colormap[c];
++	dest[3*SCREENWIDTH] = colormap[d];
++	dest += 4*SCREENWIDTH;
++    }
+ } 
+ 
+ 
+@@ -592,8 +617,8 @@
+     unsigned int position, step;
+     byte *dest;
+     int count;
+-    int spot;
+-    unsigned int xtemp, ytemp;
++    const byte *source;
++    const lighttable_t *colormap;
+ 
+ #ifdef RANGECHECK
+     if (ds_x2 < ds_x1
+@@ -616,26 +641,48 @@
+              | ((ds_yfrac >> 6)  & 0x0000ffff);
+     step = ((ds_xstep << 10) & 0xffff0000)
+          | ((ds_ystep >> 6)  & 0x0000ffff);
+-
+-    dest = ylookup[ds_y] + columnofs[ds_x1];
+-
+-    // We do not check for zero spans here?
+-    count = ds_x2 - ds_x1;
+ 
+-    do
+-    {
+-	// Calculate current texture index in u,v.
+-        ytemp = (position >> 4) & 0x0fc0;
+-        xtemp = (position >> 26);
+-        spot = xtemp | ytemp;
++    // SoC: the same pixels as upstream's loop, with the globals read once
++    // (a byte store may alias them) and four pixels per iteration.
++#define SPAN_SPOT(p) ((((p) >> 4) & 0x0fc0) | ((p) >> 26))
++    source = ds_source;
++    colormap = ds_colormap;
++    dest = viewbase + ds_y*SCREENWIDTH + ds_x1;
++    count = ds_x2 - ds_x1 + 1;
+ 
+-	// Lookup pixel from flat texture tile,
+-	//  re-index using light/colormap.
+-	*dest++ = ds_colormap[ds_source[spot]];
+-
+-        position += step;
++    // the odd pixels first, then groups of four
++    if (count & 1)
++    {
++	*dest++ = colormap[source[SPAN_SPOT(position)]];
++	position += step;
++    }
++    if (count & 2)
++    {
++	dest[0] = colormap[source[SPAN_SPOT(position)]];
++	position += step;
++	dest[1] = colormap[source[SPAN_SPOT(position)]];
++	position += step;
++	dest += 2;
++    }
++    for (count >>= 2; count > 0; count--)
++    {
++	byte a, b, c, d;
+ 
+-    } while (count--);
++	a = source[SPAN_SPOT(position)]; position += step;
++	b = source[SPAN_SPOT(position)]; position += step;
++	c = source[SPAN_SPOT(position)]; position += step;
++	d = source[SPAN_SPOT(position)]; position += step;
++	a = colormap[a];
++	b = colormap[b];
++	c = colormap[c];
++	d = colormap[d];
++	dest[0] = a;
++	dest[1] = b;
++	dest[2] = c;
++	dest[3] = d;
++	dest += 4;
++    }
++#undef SPAN_SPOT
+ }
+ 
+ 
+@@ -798,6 +845,8 @@
+     // Preclaculate all row offsets.
+     for (i=0 ; i<height ; i++) 
+ 	ylookup[i] = I_VideoBuffer + (i+viewwindowy)*SCREENWIDTH; 
++
++    viewbase = I_VideoBuffer + viewwindowy*SCREENWIDTH + viewwindowx;
+ } 
+  
+  

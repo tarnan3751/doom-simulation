@@ -1,0 +1,118 @@
+# Mutation tests for tests/core (`make -C tests/core mutate`, driver: mutate.py): each mutant
+# plants one bug in a copy of rtl/core. Configuration d = the default build, run on the short
+# regression of the `mutant` target. Mutants that name no configuration (-) only corrupt the
+# branch predictor, which must never change architectural results.
+#
+# <name> <file> <configurations that must catch it, or ->
+# -<text to replace>   (one or more lines; it must occur exactly once)
+# +<replacement>
+fwd-mem-rs1-wrong-source rv32_core.sv d
+-FWD_MEM: fwd_a = m_result;
++FWD_MEM: fwd_a = w_result;
+fwd-wb-rs2-missing rv32_core.sv d
+-FWD_WB:  fwd_b = w_result;
++FWD_WB:  fwd_b = e_rs2v;
+fwd-priority-wb-over-mem rv32_core.sv d
+-if (rs != 5'd0 && ex_v && ex_rd == rs)        fwd_sel = FWD_MEM;
+-        else if (rs != 5'd0 && mem_v && mem_rd == rs) fwd_sel = FWD_WB;
++if (rs != 5'd0 && mem_v && mem_rd == rs)      fwd_sel = FWD_WB;
++        else if (rs != 5'd0 && ex_v && ex_rd == rs)   fwd_sel = FWD_MEM;
+no-load-use-stall rv32_core.sv d
+-assign load_use = d_valid && e_valid
++assign load_use = 1'b0 && d_valid && e_valid
+load-use-ignores-rs2 rv32_core.sv d
+-(dec.uses_rs2 && d_rs2 == e_dec.rd));
++1'b0);
+fetch-during-load-use-stall rv32_core.sv d
+-assign fetch_go = advance && !(load_use && !redirect);
++assign fetch_go = advance;
+advance-ignores-dmem-ready rv32_core.sv d
+-assign advance  = !rst && imem_rsp_ready && dmem_rsp_ready && !ex_busy;
++assign advance  = !rst && imem_rsp_ready && !ex_busy;
+advance-ignores-imem-ready rv32_core.sv d
+-assign advance  = !rst && imem_rsp_ready && dmem_rsp_ready && !ex_busy;
++assign advance  = !rst && dmem_rsp_ready && !ex_busy;
+muldiv-no-wait rv32_core.sv d
+-assign ex_busy = e_valid && e_dec.is_md && !md_done;
++assign ex_busy = 1'b0;
+dmem-req-not-gated-by-advance rv32_core.sv d
+-assign dmem_req_valid = advance && e_valid
++assign dmem_req_valid = !rst && e_valid
+misaligned-access-still-issued rv32_core.sv d
+-(e_dec.is_load || e_dec.is_store) && !mis_mem;
++(e_dec.is_load || e_dec.is_store);
+flush-does-not-clear-id rv32_core.sv d
+-d_valid <= f_valid && !redirect;
++d_valid <= f_valid;
+flush-does-not-clear-ex rv32_core.sv d
+-e_valid <= d_valid && !redirect && !load_use;
++e_valid <= d_valid && !load_use;
+trap-still-writes-rd rv32_core.sv d
+-m_rd     <= exc ? 5'd0 : e_dec.rd;
++m_rd     <= e_dec.rd;
+target-mismatch-not-redirected rv32_core.sv d
+-assign mispredict = (taken != e_pred_taken) || (taken && !tgt_match);
++assign mispredict = (taken != e_pred_taken);
+jalr-bit0-not-cleared rv32_core.sv d
+-assign tgt        = e_dec.is_jalr ? {agu[31:1], 1'b0} : e_pcimm;
++assign tgt        = e_dec.is_jalr ? agu : e_pcimm;
+sh-upper-lower-swapped rv32_core.sv d
+-st_strb = agu[1] ? 4'b1100 : 4'b0011;
++st_strb = agu[1] ? 4'b0011 : 4'b1100;
+lb-zero-extends rv32_core.sv d
+-3'b000:  ld_data = {{24{ld_shift[7]}},  ld_shift[7:0]};
++3'b000:  ld_data = {24'b0,  ld_shift[7:0]};
+regfile-no-write-through rv32_regfile.sv d
+-else if (wen && waddr == raddr1)    rdata1 = wdata;
++else if (1'b0)                      rdata1 = wdata;
+minstret-counts-traps rv32_csr.sv d
+-else if (commit && !trap)             minstret_q <= minstret_q + 64'd1;
++else if (commit)                      minstret_q <= minstret_q + 64'd1;
+minstret-write-plus-increment rv32_csr.sv d
+-if (w && waddr == CSR_MINSTRET)       minstret_q <= {minstret_q[63:32], wdata};
++if (w && waddr == CSR_MINSTRET)       minstret_q <= {minstret_q[63:32], wdata + 32'd1};
+mepc-off-by-one rv32_csr.sv d
+-mepc_q       <= trap_pc;
++mepc_q       <= trap_pc + 30'd1;
+mret-keeps-mie rv32_csr.sv d
+-mstatus_mie  <= mstatus_mpie;
++mstatus_mie  <= 1'b0;
+ro-csr-write-allowed rv32_decode.sv d
+-!(d.csr_write && (insn[31:30] == 2'b11));
++1'b1;
+ecall-wrong-cause rv32_pkg.sv d
+-localparam logic [3:0] EXC_ECALL_M          = 4'd11;
++localparam logic [3:0] EXC_ECALL_M          = 4'd8;
+mulhsu-treats-rs2-signed rv32_muldiv.sv d
+-mul_b <= {(op[1:0] == 2'b01) && b_neg, b};
++mul_b <= {(op[1:0] != 2'b11) && b_neg, b};
+div-by-zero-quotient rv32_muldiv.sv d
+-div_quo <= 32'hFFFF_FFFF;
++div_quo <= 32'h0;
+rem-sign-from-divisor rv32_muldiv.sv d
+-neg_r   <= op_signed_div && a_neg;
++neg_r   <= op_signed_div && b_neg;
+div-skip-one-iteration rv32_muldiv.sv d
+-div_cnt <= 5'd31 - zb[4:0] + za[4:0];
++div_cnt <= 5'd31 - zb[4:0] + za[4:0] + 5'd1;
+div-zero-quotient-on-equal-length rv32_muldiv.sv d
+-if (zb < za) begin
++if (zb <= za) begin
+div-normalise-one-bit-short rv32_muldiv.sv d
+-assign div_norm = {32'b0, div_quo} << (5'd31 - zb[4:0] + za[4:0]);   // shift 32 - n
++assign div_norm = {32'b0, div_quo} << (5'd30 - zb[4:0] + za[4:0]);   // shift 32 - n
+predictor-ras-pushes-garbage rv32_bpred.sv -
+-ras[ras_inc(ras_sp)] <= f_pc4;
++ras[ras_inc(ras_sp)] <= f_pc4 + 30'd5;
+predictor-bht-inverted rv32_bpred.sv -
+-if (up_taken) bht_new
++if (!up_taken) bht_new
+predictor-btb-target-garbage rv32_bpred.sv -
+-btb_wentry.tgt   = up_target[TGT_HI:TGT_LO];
++btb_wentry.tgt   = up_target[TGT_HI:TGT_LO] ^ 21'h155;
+mcycle-counts-commits-only rv32_csr.sv d
+-else                                mcycle_q <= mcycle_q + 64'd1;
++else if (commit)                    mcycle_q <= mcycle_q + 64'd1;
+mcycleh-write-also-increments rv32_csr.sv d
+-else if (w && waddr == CSR_MCYCLEH) mcycle_q <= {wdata, mcycle_q[31:0]};
++else if (w && waddr == CSR_MCYCLEH) mcycle_q <= {wdata, mcycle_q[31:0] + 32'd1};

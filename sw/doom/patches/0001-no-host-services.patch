@@ -1,0 +1,101 @@
+Patch 0001: no host services - I_Error only prints and exits (no zenity/system(), no <unistd.h>),
+M_MakeDirectory does nothing, and a failed savegame write prints a message instead of I_Error: the SoC
+has no OS or storage, and the native reference must behave the same.
+
+diff -ruN a/g_game.c b/g_game.c
+--- a/g_game.c	2026-11-06 06:20:38
++++ b/g_game.c	2026-11-06 06:20:39
+@@ -17,6 +17,7 @@
+ 
+ 
+ 
++#include <stdio.h>
+ #include <string.h>
+ #include <stdlib.h>
+ #include <math.h>
+@@ -1627,13 +1628,11 @@
+     {
+         // Failed to save the game, so we're going to have to abort. But
+         // to be nice, save to somewhere else before we call I_Error().
+-        recovery_savegame_file = M_TempFile("recovery.dsg");
+-        save_stream = fopen(recovery_savegame_file, "wb");
+-        if (save_stream == NULL)
+-        {
+-            I_Error("Failed to open either '%s' or '%s' to write savegame.",
+-                    temp_savegame_file, recovery_savegame_file);
+-        }
++        printf("G_DoSaveGame: cannot write '%s', savegame skipped\n",
++               temp_savegame_file);
++        gameaction = ga_nothing;
++        M_StringCopy(savedescription, "", sizeof(savedescription));
++        return;
+     }
+ 
+     savegame_error = false;
+diff -ruN a/i_system.c b/i_system.c
+--- a/i_system.c	2026-11-06 06:20:38
++++ b/i_system.c	2026-11-06 06:20:39
+@@ -26,8 +26,6 @@
+ #ifdef _WIN32
+ #define WIN32_LEAN_AND_MEAN
+ #include <windows.h>
+-#else
+-#include <unistd.h>
+ #endif
+ 
+ #ifdef ORIGCODE
+@@ -264,7 +262,7 @@
+ #endif
+ }
+ 
+-#if !defined(_WIN32) && !defined(__MACOSX__) && !defined(__DJGPP__)
++#if 0 /* zenity error box removed */
+ #define ZENITY_BINARY "/usr/bin/zenity"
+ 
+ // returns non-zero if zenity is available
+@@ -403,7 +401,7 @@
+         entry = entry->next;
+     }
+ 
+-    exit_gui_popup = !M_ParmExists("-nogui");
++    exit_gui_popup = false; /* never pop up a GUI box, never call system() */
+ 
+     // Pop up a GUI dialog box to show the error message, if the
+     // game was not run from the console (and the user will
+@@ -456,7 +454,7 @@
+ 
+ #else
+     {
+-        ZenityErrorBox(msgbuf);
++        /* no GUI error box */
+     }
+ #endif
+ 
+diff -ruN a/m_misc.c b/m_misc.c
+--- a/m_misc.c	2026-11-06 06:20:38
++++ b/m_misc.c	2026-11-06 06:20:39
+@@ -31,9 +31,6 @@
+ #ifdef _MSC_VER
+ #include <direct.h>
+ #endif
+-#else
+-#include <sys/stat.h>
+-#include <sys/types.h>
+ #endif
+ 
+ #include "doomtype.h"
+@@ -54,11 +51,9 @@
+ 
+ void M_MakeDirectory(char *path)
+ {
+-#ifdef _WIN32
+-    mkdir(path);
+-#else
+-    mkdir(path, 0755);
+-#endif
++    /* No directory is ever created: neither the target nor the reference
++       build has anywhere to keep configuration or savegames. */
++    (void) path;
+ }
+ 
+ // Check if a file exists

@@ -1,0 +1,122 @@
+# Mutation tests for tests/mem (`make -C tests/mem mutate`, driver: ../core/mutate.py): each
+# mutant plants one bug in a copy of rtl/mem; it must be caught (the bench fails) in exactly the
+# configurations that instantiate the mutated logic: s = sdram_def, f = ideal_tiny (FAST backend,
+# tiny caches). `control` changes nothing and must not be caught. `dc_copy_unblocked` is
+# equivalent with SDRAM, whose first beat comes after the 4-cycle victim copy anyway.
+#
+# <name> <file> <configurations that must catch it, or ->
+# -<text to replace>   (one or more lines; it must occur exactly once)
+# +<replacement>
+bypass_off dcache.sv sf
+-else if (byp_wr && d_we[i])
++else if (1'b0)
+dirty_lost dcache.sv sf
+-drt_wword[req_idx[1:0]] = req_we_q;
++drt_wword[req_idx[1:0]] = 1'b0;
+merge_beat dcache.sv sf
+-(own && (fill_cnt == 3'd0) && req_we_q
++(own && (fill_cnt == 3'd1) && req_we_q
+lanes_all dcache.sv sf
+-((store_hit && !fill_on) ? req_wstrb_q : 4'h0)
++((store_hit && !fill_on) ? 4'hF : 4'h0)
+wb_address dcache.sv sf
+-wb_line <= {tag_rdata[TAG_W-1:0], req_idx};
++wb_line <= {req_tag, req_idx};
+hold_reread dcache.sv sf
+-assign d_re    = req_valid ||
++assign d_re    = 1'b1 ||
+ready_no_hit dcache.sv sf
+-ok = hit && !(req_we_q && sb_v);
++ok = !(req_we_q && sb_v);
+perf_miss_early dcache.sv sf
+-assign perf_miss   = miss_q;
++assign perf_miss   = (state == S_LOOKUP) && miss;
+alias_bit dcache.sv sf
+-if (req_valid) begin
+-                req_q       <= req_addr[RAM_AW-1:2];
++if (req_valid) begin
++                req_q       <= req_addr[RAM_AW-1:2] ^ {req_addr[RAM_AW], {(RAM_AW-3){1'b0}}};
+dc_word_early dcache.sv sf
+-ok = fill_mask[req_w] || beat_now;
++ok = 1'b1;
+dc_beat_word dcache.sv sf
+-assign beat_now  = in_fill && lp_rvalid && (fill_w == req_w)
++assign beat_now  = in_fill && lp_rvalid && (fill_w[1:0] == req_w[1:0])
+dc_hold_lost dcache.sv sf
+-else if (beat_now) hold_v <= 1'b1;
++else if (beat_now) hold_v <= 1'b0;
+dc_copy_unblocked dcache.sv f
+-if (vx_on)                              ok = 1'b0;
++if (1'b0)                               ok = 1'b0;
+dc_copy_order dcache.sv sf
+-vx_p    <= req_w[2:1] + 1'b1;
++vx_p    <= req_w[2:1] + 2'd2;
+dc_wb_too_soon dcache.sv sf
+-(!wb_full || (!victim_dirty &&
++(1'b1 || (!victim_dirty &&
+dc_wb_line_raw dcache.sv sf
+-(req_q[RAM_AW-3:3] != wb_line)
++1'b1
+dc_wb_req_lost dcache.sv sf
+-(!victim_dirty && !lp_req_q &&
++(!victim_dirty &&
+dc_sb_ignored dcache.sv sf
+-assign byp_sb   = sb_v && fill_on && (sb_a == d_raddr);
++assign byp_sb   = 1'b0;
+dc_post_ignored dcache.sv sf
+-assign byp_post = post && ({req_idx, req_w} == d_raddr);
++assign byp_post = 1'b0;
+dc_sb_not_merged dcache.sv sf
+-&& !(sb_beat && sb_strb[i]))
++)
+dc_sb_vs_miss dcache.sv sf
+-!fill_on && !sb_v &&
++!fill_on &&
+dc_two_stores dcache.sv sf
+-ok = hit && !(req_we_q && sb_v);
++ok = hit;
+ic_no_cwf icache.sv sf
+-fill_w    <= req_w;             // critical word first
++fill_w    <= 3'd0;
+ic_tag_invalid icache.sv sf
+-assign tag_wdata = (state == S_INIT) ? '0 : {1'b1, req_tag};
++assign tag_wdata = (state == S_INIT) ? '0 : {1'b0, req_tag};
+ic_word_early icache.sv sf
+-assign ok        = in_fill ? (fill_mask[req_w] || beat_now) : hit;
++assign ok        = in_fill ? 1'b1 : hit;
+ic_beat_word icache.sv sf
+-assign beat_now  = in_fill && lp_rvalid && (fill_w == req_w);
++assign beat_now  = in_fill && lp_rvalid && (fill_w[1:0] == req_w[1:0]);
+ic_no_coll icache.sv sf
+-assign rsp_rdata = beat_now ? lp_rdata : coll ? last_d : d_rdata;
++assign rsp_rdata = beat_now ? lp_rdata : d_rdata;
+ic_two_fills icache.sv sf
+-assign start     = ((state == S_LOOKUP) || (state == S_WAIT)) && miss && !fill_on;
++assign start     = ((state == S_LOOKUP) || (state == S_WAIT)) && miss;
+r5_comb_path icache.sv sf
+-assign rsp_ready = (state == S_READY) || (((state == S_LOOKUP) || (state == S_WAIT)) && ok);
++assign rsp_ready = ((state == S_READY) || (((state == S_LOOKUP) || (state == S_WAIT)) && ok)) && !(req_valid && req_addr[3]);
+arb_route mem_arb.sv sf
+-assign i_rvalid = bk_rvalid && !bk_rid;
++assign i_rvalid = bk_rvalid && !sel_d;
+rd_wait_short sdram_ctrl.sv s
+-cnt   <= CNT_W'(W_RD);
++cnt   <= CNT_W'(W_RD - 1);
+wr_wait_short sdram_ctrl.sv s
+-cnt   <= CNT_W'(W_WR);
++cnt   <= CNT_W'(W_WR - 1);
+cl_capture sdram_ctrl.sv s
+-assign bk_rvalid = rdp[CL+1];
++assign bk_rvalid = rdp[CL];
+no_refresh sdram_ctrl.sv s
+-assign ref_inc   = init_done && (ref_timer == '0) && (ref_pend != 3'd7);
++assign ref_inc   = 1'b0;
+init_one_ref sdram_ctrl.sv s
+-localparam int unsigned INIT_REFS = 8;
++localparam int unsigned INIT_REFS = 1;
+ideal_wrap mem_ideal.sv f
+-word_q    <= bk_word + 3'd1;
++word_q    <= bk_word + 3'd2;
+control memsys.sv -
+-localparam int unsigned LA_W   = RAM_AW - 5;
++localparam int unsigned LA_W   = RAM_AW - 5;

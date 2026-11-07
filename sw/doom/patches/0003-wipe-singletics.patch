@@ -1,0 +1,37 @@
+Patch 0003: the melt wipe advances one tic per presented frame when singletics is set (-timedemo) and
+never reads the clock, so the frames do not depend on the machine's speed.  Interactive play unchanged.
+
+diff -ruN a/d_main.c b/d_main.c
+--- a/d_main.c	2026-11-06 06:20:39
++++ b/d_main.c	2026-11-06 06:20:39
+@@ -312,14 +312,23 @@
+ 
+     do
+     {
+-	do
++	if (singletics)
+ 	{
+-	    nowtime = I_GetTime ();
+-	    tics = nowtime - wipestart;
+-            I_Sleep(1);
+-	} while (tics <= 0);
+-        
+-	wipestart = nowtime;
++	    // Timing a demo: the melt advances by exactly one tic per
++	    // presented frame; the clock is not consulted at all.
++	    tics = 1;
++	}
++	else
++	{
++	    do
++	    {
++	        nowtime = I_GetTime ();
++	        tics = nowtime - wipestart;
++                I_Sleep(1);
++	    } while (tics <= 0);
++
++	    wipestart = nowtime;
++	}
+ 	done = wipe_ScreenWipe(wipe_Melt
+ 			       , 0, 0, SCREENWIDTH, SCREENHEIGHT, tics);
+ 	I_UpdateNoBlit ();

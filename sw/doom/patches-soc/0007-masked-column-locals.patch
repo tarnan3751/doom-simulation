@@ -1,0 +1,61 @@
+SoC patch 0007: R_DrawMaskedColumn keeps the sprite state in locals; colfunc changes none of it, but
+the compiler reloaded it after every call.  dc_yl/dc_yh are still stored for every post.
+
+--- a/r_things.c	2026-11-06 13:24:17
++++ b/r_things.c	2026-11-06 13:24:17
+@@ -345,6 +345,15 @@
+     int		topscreen;
+     int 	bottomscreen;
+     fixed_t	basetexturemid;
++    int		yl;
++    int		yh;
++    // SoC: the sprite state in locals.  colfunc changes none of it, but the
++    // compiler would reload it after every call.
++    const fixed_t	topscr = sprtopscreen;
++    const fixed_t	yscale = spryscale;
++    const int		fclip = mfloorclip[dc_x];
++    const int		cclip = mceilingclip[dc_x];
++    void		(*const drawcol) (void) = colfunc;
+ 	
+     basetexturemid = dc_texturemid;
+ 	
+@@ -352,18 +361,21 @@
+     {
+ 	// calculate unclipped screen coordinates
+ 	//  for post
+-	topscreen = sprtopscreen + spryscale*column->topdelta;
+-	bottomscreen = topscreen + spryscale*column->length;
++	topscreen = topscr + yscale*column->topdelta;
++	bottomscreen = topscreen + yscale*column->length;
+ 
+-	dc_yl = (topscreen+FRACUNIT-1)>>FRACBITS;
+-	dc_yh = (bottomscreen-1)>>FRACBITS;
++	yl = (topscreen+FRACUNIT-1)>>FRACBITS;
++	yh = (bottomscreen-1)>>FRACBITS;
+ 		
+-	if (dc_yh >= mfloorclip[dc_x])
+-	    dc_yh = mfloorclip[dc_x]-1;
+-	if (dc_yl <= mceilingclip[dc_x])
+-	    dc_yl = mceilingclip[dc_x]+1;
++	if (yh >= fclip)
++	    yh = fclip-1;
++	if (yl <= cclip)
++	    yl = cclip+1;
+ 
+-	if (dc_yl <= dc_yh)
++	dc_yl = yl;
++	dc_yh = yh;
++
++	if (yl <= yh)
+ 	{
+ 	    dc_source = (byte *)column + 3;
+ 	    dc_texturemid = basetexturemid - (column->topdelta<<FRACBITS);
+@@ -371,7 +383,7 @@
+ 
+ 	    // Drawn by either R_DrawColumn
+ 	    //  or (SHADOW) R_DrawFuzzColumn.
+-	    colfunc ();	
++	    drawcol ();	
+ 	}
+ 	column = (column_t *)(  (byte *)column + column->length + 4);
+     }

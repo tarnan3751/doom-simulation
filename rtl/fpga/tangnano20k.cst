@@ -1,0 +1,64 @@
+// Sipeed Tang Nano 20K (GW2AR-LV18QN88C8/I7) pin constraints for tangnano20k_top.
+//
+//                        *** NEVER TESTED ON HARDWARE ***
+//
+// Sources and confidence, per pin:
+//   [chipdb]      confirmed locally from the apicula chip database shipped in
+//                 .tools/oss-cad-suite (lib/python3.11/site-packages/apycula/GW2A-18C.msgpack.xz,
+//                 package GW2AR-18C / QFN88): the pin exists, its IOB name and its
+//                 special function. This confirms the FPGA side only, not what the
+//                 board connects to the pin.
+//   [UNVERIFIED]  board wiring from the author's knowledge of the Tang Nano 20K
+//                 schematic and Sipeed's examples; no local source. Check against
+//                 the schematic before use.
+//
+// The in-package SDRAM (O_sdram_*, IO_sdram_dq) is NOT listed here: nextpnr
+// constrains those ports by name from the chip database's SiP pin map [chipdb].
+
+// 27 MHz crystal oscillator. [chipdb] pin 4 = IOL7A, function LPLL1_T_IN (dedicated
+// input of left PLL 1), consistent with a board clock. [UNVERIFIED] that the
+// oscillator is on it.
+IO_LOC  "clk27" 4;
+IO_PORT "clk27" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+
+// Push button S1 = reset. [chipdb] pin 88 = IOR30A (MODE0, usable as GPIO after
+// configuration). [UNVERIFIED] wiring and polarity: assumed to read 1 while pressed
+// (tangnano20k_top BTN_ACTIVE_HIGH = 1). If the LEDs show "locked" (LED 2) but no
+// heartbeat (LED 0), the polarity is inverted: set BTN_ACTIVE_HIGH = 0.
+IO_LOC  "btn_s1" 88;
+IO_PORT "btn_s1" IO_TYPE=LVCMOS33 PULL_MODE=NONE;
+
+// Serial TX to the on-board BL616 USB-UART bridge. [chipdb] pin 69 = IOT50A.
+// [UNVERIFIED] that pin 69 is the FPGA-TX side of the bridge (RX would be pin 70).
+IO_LOC  "uart_tx" 69;
+IO_PORT "uart_tx" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8;
+
+// Six user LEDs, active low. [chipdb] pins 15-20 = IOL47A/B, IOL49A/B, IOL51A/B.
+// [UNVERIFIED] LED wiring and polarity.
+IO_LOC  "led_n[0]" 15;
+IO_LOC  "led_n[1]" 16;
+IO_LOC  "led_n[2]" 17;
+IO_LOC  "led_n[3]" 18;
+IO_LOC  "led_n[4]" 19;
+IO_LOC  "led_n[5]" 20;
+IO_PORT "led_n[0]" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8;
+IO_PORT "led_n[1]" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8;
+IO_PORT "led_n[2]" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8;
+IO_PORT "led_n[3]" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8;
+IO_PORT "led_n[4]" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8;
+IO_PORT "led_n[5]" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8;
+
+// HDMI connector, DVI/TMDS lanes. Only the P pin of each pair is named ("p,n"
+// notation); the N pin is implied by the TLVDS_OBUF.
+// [chipdb] pins 33/34 = IOB24A/B, 35/36 = IOB30A/B, 37/38 = IOB34A/B, 39/40 = IOB40A/B
+// are true differential pairs, and gowin_pack confirms they are True-LVDS pins
+// (it rejects an emulated-LVDS buffer there).
+// [UNVERIFIED] lane assignment (clock on 33/34, data 0 = blue on 35/36, data 1 =
+// green on 37/38, data 2 = red on 39/40) and that the board's level shifting
+// makes the LVDS buffer acceptable for a TMDS sink.
+// Each lane is a scalar port on purpose: with bus-indexed names (tmds_d_p[0])
+// this nextpnr build fails to pair the N side ("Unconstrained IO").
+IO_LOC  "tmds_clk_p" 33,34;
+IO_LOC  "tmds_d0_p"  35,36;
+IO_LOC  "tmds_d1_p"  37,38;
+IO_LOC  "tmds_d2_p"  39,40;

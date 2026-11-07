@@ -1,0 +1,71 @@
+Patch 0002: a finished -timedemo prints "timed N gametics in M realtics (F fps)" on stdout (fps in
+integer arithmetic: no float printf), runs the exit functions and exits 0; upstream I_Error'd (status
+255).  I_InError() keeps a real error during a timedemo an error (G_CheckDemoStatus is also an exit
+function of I_Error).
+
+diff -ruN a/g_game.c b/g_game.c
+--- a/g_game.c	2026-11-06 06:20:39
++++ b/g_game.c	2026-11-06 06:20:39
+@@ -2250,19 +2250,30 @@
+ 	 
+     if (timingdemo) 
+     { 
+-        float fps;
+         int realtics;
++        int fps100;
+ 
++        // This function is also an exit function run by I_Error; an error
++        // must not be reported as a finished timedemo (and not exit with 0).
++        if (I_InError ())
++            return false;
++
+ 	endtime = I_GetTime (); 
+         realtics = endtime - starttime;
+-        fps = ((float) gametic * TICRATE) / realtics;
++        // fps with two decimals in integer arithmetic (no float printf)
++        fps100 = realtics > 0 ? (int) (((long long) gametic * TICRATE * 100) / realtics) : 0;
+ 
+         // Prevent recursive calls
+         timingdemo = false;
+         demoplayback = false;
+ 
+-	I_Error ("timed %i gametics in %i realtics (%f fps)",
+-                 gametic, realtics, fps);
++        // A finished timedemo is not an error: report, run the exit
++        // functions and leave with status 0.
++	printf ("timed %i gametics in %i realtics (%i.%02i fps)\n",
++                gametic, realtics, fps100 / 100, fps100 % 100);
++        fflush (stdout);
++        I_Quit ();
++        exit (0);
+     } 
+ 	 
+     if (demoplayback) 
+diff -ruN a/i_system.c b/i_system.c
+--- a/i_system.c	2026-11-06 06:20:39
++++ b/i_system.c	2026-11-06 06:20:39
+@@ -354,6 +354,11 @@
+ 
+ static boolean already_quitting = false;
+ 
++boolean I_InError (void)
++{
++    return already_quitting;
++}
++
+ void I_Error (char *error, ...)
+ {
+     char msgbuf[512];
+diff -ruN a/i_system.h b/i_system.h
+--- a/i_system.h	2026-11-06 06:20:39
++++ b/i_system.h	2026-11-06 06:20:39
+@@ -54,6 +54,9 @@
+ 
+ void I_Error (char *error, ...);
+ 
++// True once I_Error has started shutting the program down.
++boolean I_InError (void);
++
+ void I_Tactile (int on, int off, int total);
+ 
+ boolean I_GetMemoryValue(unsigned int offset, void *value, int size);
